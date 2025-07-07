@@ -1,0 +1,1373 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Organizing Life Towards the Future</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100;200;300;400;500;600;700&family=Space+Mono:wght@300;400;500;600;700&family=IBM+Plex+Serif:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        'primary': ['Inter', 'sans-serif'],
+                        'mono': ['Space Mono', 'monospace']
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        #shader-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+        }
+        
+        .content {
+            position: relative;
+            z-index: 10;
+        }
+
+        @keyframes word-appear {
+            0% {
+                opacity: 0;
+                transform: translateY(30px) scale(0.8);
+                filter: blur(10px);
+            }
+            100% {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+                filter: blur(0);
+            }
+        }
+        
+        @keyframes grid-draw {
+            0% {
+                stroke-dashoffset: 1000;
+                opacity: 0;
+            }
+            100% {
+                stroke-dashoffset: 0;
+                opacity: 0.3;
+            }
+        }
+        
+        @keyframes pulse-glow {
+            0%, 100% {
+                opacity: 0.3;
+                transform: scale(1);
+            }
+            50% {
+                opacity: 0.8;
+                transform: scale(1.2);
+            }
+        }
+        
+        .word {
+            display: inline-block;
+            opacity: 0;
+            margin: 0 0.1em;
+            transition: all 0.3s ease;
+        }
+        
+        .word:hover {
+            color: #60a5fa;
+            transform: translateY(-2px);
+            text-shadow: 0 0 20px rgba(96, 165, 250, 0.5);
+        }
+        
+        .grid-line {
+            stroke: #60a5fa;
+            stroke-width: 0.8;
+            opacity: 0;
+            stroke-dasharray: 10 5;
+            stroke-dashoffset: 1000;
+            animation: grid-draw 3s ease-out forwards;
+        }
+        
+        .corner-dot {
+            fill: #60a5fa;
+            opacity: 0;
+            animation: pulse-glow 2s ease-in-out infinite;
+        }
+        
+        .floating-particle {
+            position: absolute;
+            width: 3px;
+            height: 3px;
+            background: #60a5fa;
+            border-radius: 50%;
+            opacity: 0;
+            animation: float-particle 6s ease-in-out infinite;
+        }
+        
+        @keyframes float-particle {
+            0%, 100% {
+                transform: translateY(0) translateX(0);
+                opacity: 0.1;
+            }
+            50% {
+                transform: translateY(-20px) translateX(10px);
+                opacity: 0.8;
+            }
+        }
+
+        .text-glow {
+            text-shadow: 0 0 30px rgba(96, 165, 250, 0.3);
+        }
+
+        .backdrop-overlay {
+            background: rgba(0, 0, 0, 0.4);
+            backdrop-filter: blur(1px);
+        }
+
+        /* Chat Interface Styles */
+        .beautiful-shadow {
+            box-shadow: 
+                0 2.8px 2.2px rgba(0, 0, 0, 0.034),
+                0 6.7px 5.3px rgba(0, 0, 0, 0.048),
+                0 12.5px 10px rgba(0, 0, 0, 0.06),
+                0 22.3px 17.9px rgba(0, 0, 0, 0.072),
+                0 41.8px 33.4px rgba(0, 0, 0, 0.086),
+                0 100px 80px rgba(0, 0, 0, 0.12);
+        }
+
+        .transition-custom {
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 2.2);
+        }
+
+        .scrollbar-thin {
+            scrollbar-width: thin;
+            scrollbar-color: rgba(96, 165, 250, 0.3) transparent;
+        }
+
+        .scrollbar-thin::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .scrollbar-thin::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .scrollbar-thin::-webkit-scrollbar-thumb {
+            background: rgba(96, 165, 250, 0.3);
+            border-radius: 3px;
+        }
+
+        .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+            background: rgba(96, 165, 250, 0.5);
+        }
+
+        @keyframes slide-up {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .animate-slide-up {
+            animation: slide-up 0.3s ease-out;
+        }
+
+        /* Transition animations */
+        @keyframes fade-out {
+            to {
+                opacity: 0;
+                transform: scale(0.95);
+            }
+        }
+
+        @keyframes fade-in {
+            from {
+                opacity: 0;
+                transform: scale(0.95);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
+        .fade-out {
+            animation: fade-out 0.5s ease-out forwards;
+        }
+
+        .fade-in {
+            animation: fade-in 0.5s ease-out forwards;
+        }
+
+        /* Enter button styles */
+        .enter-button {
+            background: rgba(96, 165, 250, 0.1);
+            border: 1px solid rgba(96, 165, 250, 0.3);
+            backdrop-filter: blur(10px);
+            transition: all 0.3s ease;
+        }
+
+        .enter-button:hover {
+            background: rgba(96, 165, 250, 0.2);
+            border-color: rgba(96, 165, 250, 0.5);
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px rgba(96, 165, 250, 0.3);
+        }
+
+        /* Login form styles */
+        .glass-input {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            transition: all 0.3s ease;
+        }
+
+        .glass-input:focus {
+            background: rgba(255, 255, 255, 0.08);
+            border-color: rgba(96, 165, 250, 0.5);
+            box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.1);
+            outline: none;
+        }
+
+        .login-button {
+            background: linear-gradient(135deg, rgba(96, 165, 250, 0.2), rgba(59, 130, 246, 0.3));
+            border: 1px solid rgba(96, 165, 250, 0.3);
+            backdrop-filter: blur(10px);
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .login-button::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+            transition: left 0.5s;
+        }
+
+        .login-button:hover::before {
+            left: 100%;
+        }
+
+        .login-button:hover {
+            background: linear-gradient(135deg, rgba(96, 165, 250, 0.3), rgba(59, 130, 246, 0.4));
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px rgba(96, 165, 250, 0.3);
+        }
+
+        /* Typing animation */
+        @keyframes typing {
+            0%, 100% { opacity: 0; }
+            50% { opacity: 1; }
+        }
+
+        .typing-dot {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: rgba(96, 165, 250, 0.8);
+            margin: 0 2px;
+            animation: typing 1.4s infinite;
+        }
+
+        .typing-dot:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+
+        .typing-dot:nth-child(3) {
+            animation-delay: 0.4s;
+        }
+
+        /* Error message styles */
+        .error-message {
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            color: #fca5a5;
+            padding: 0.75rem;
+            border-radius: 0.5rem;
+            margin-top: 1rem;
+            font-size: 0.875rem;
+            animation: slide-up 0.3s ease-out;
+        }
+
+        /* Chat message hover effects */
+        .message-container {
+            position: relative;
+            transition: all 0.3s ease;
+        }
+
+        .message-container:hover {
+            transform: translateY(-2px);
+        }
+
+        .message-actions {
+            opacity: 0;
+            transition: opacity 0.2s ease;
+        }
+
+        .message-container:hover .message-actions {
+            opacity: 1;
+        }
+
+        /* Modern message styling */
+        .message-bubble {
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(20px);
+            border-radius: 18px;
+            transition: all 0.3s ease;
+        }
+
+        .message-bubble:hover {
+            background: rgba(255, 255, 255, 0.12);
+            border-color: rgba(96, 165, 250, 0.3);
+            box-shadow: 0 8px 32px rgba(96, 165, 250, 0.1);
+            transform: translateY(-1px);
+        }
+
+        .user-message {
+            background: linear-gradient(135deg, rgba(96, 165, 250, 0.15), rgba(59, 130, 246, 0.1));
+            border: 1px solid rgba(96, 165, 250, 0.2);
+            border-radius: 18px;
+        }
+
+        .user-message:hover {
+            background: linear-gradient(135deg, rgba(96, 165, 250, 0.25), rgba(59, 130, 246, 0.15));
+            border-color: rgba(96, 165, 250, 0.4);
+        }
+
+        /* Logout confirmation modal */
+        .logout-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(10px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
+        }
+
+        .logout-modal.show {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .logout-modal-content {
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 20px;
+            padding: 2rem;
+            max-width: 400px;
+            width: 90%;
+            text-align: center;
+            transform: scale(0.9);
+            transition: transform 0.3s ease;
+        }
+
+        .logout-modal.show .logout-modal-content {
+            transform: scale(1);
+        }
+
+        /* Sidebar styles */
+        .sidebar {
+            transform: translateX(-100%);
+            transition: transform 0.3s ease;
+        }
+
+        .sidebar.open {
+            transform: translateX(0);
+        }
+
+        /* Settings panel styles */
+        .settings-panel {
+            transform: translateX(100%);
+            transition: transform 0.3s ease;
+        }
+
+        .settings-panel.open {
+            transform: translateX(0);
+        }
+    </style>
+</head>
+<body class="bg-black text-white min-h-screen overflow-hidden font-primary">
+    <canvas id="shader-canvas"></canvas>
+
+    <!-- Landing Page -->
+    <div id="landing-page" class="content flex flex-col items-center justify-center min-h-screen p-8 backdrop-overlay">
+
+        <!-- Floating Particles -->
+        <div class="floating-particle" style="top: 20%; left: 10%; animation-delay: 2s;"></div>
+        <div class="floating-particle" style="top: 60%; left: 85%; animation-delay: 3s;"></div>
+        <div class="floating-particle" style="top: 80%; left: 15%; animation-delay: 4s;"></div>
+        <div class="floating-particle" style="top: 30%; left: 90%; animation-delay: 5s;"></div>
+
+        <!-- Top Section -->
+        <div class="text-center mb-12">
+            <h2 class="text-xs md:text-sm font-mono font-light text-blue-300 uppercase tracking-[0.3em] opacity-80">
+                <span class="word" data-delay="0">Organizing</span>
+                <span class="word" data-delay="200">life</span>
+                <span class="word" data-delay="400">towards</span>
+                <span class="word" data-delay="600">the</span>
+                <span class="word" data-delay="800">future</span>
+            </h2>
+        </div>
+
+        <!-- Main Content -->
+        <div class="text-center max-w-4xl mx-auto mb-12">
+            <h1 class="text-4xl md:text-6xl lg:text-7xl font-extralight leading-tight tracking-tight text-white text-glow mb-8">
+                <div class="mb-6">
+                    <span class="word" data-delay="1000">Infinity</span>
+                </div>
+                <div class="text-xl md:text-2xl lg:text-3xl font-thin text-blue-200 leading-relaxed">
+                    <span class="word" data-delay="1500">Let</span>
+                    <span class="word" data-delay="1650">the</span>
+                    <span class="word" data-delay="1800">past</span>
+                    <span class="word" data-delay="1950">be</span>
+                    <span class="word" data-delay="2100">what</span>
+                    <span class="word" data-delay="2250">it</span>
+                    <span class="word" data-delay="2400">is,</span>
+                    <span class="word" data-delay="2550">a</span>
+                    <span class="word" data-delay="2700">Past.</span>
+                </div>
+            </h1>
+
+            <!-- Enter Button -->
+            <button id="enter-portal" class="enter-button mt-12 px-8 py-3 rounded-full text-blue-300 font-mono text-sm uppercase tracking-wider opacity-0" style="animation: word-appear 1s ease-out forwards; animation-delay: 3.5s;">
+                Enter Infinity
+            </button>
+        </div>
+
+        <!-- Bottom Section -->
+        <div class="text-center">
+            <div class="max-w-2xl mx-auto">
+                <p class="text-sm md:text-base font-light text-blue-200 leading-relaxed italic opacity-80">
+                    <span class="word" data-delay="3300">"no</span>
+                    <span class="word" data-delay="3400">matter</span>
+                    <span class="word" data-delay="3500">—</span>
+                    <span class="word" data-delay="3600">tomorrow</span>
+                    <span class="word" data-delay="3700">we</span>
+                    <span class="word" data-delay="3800">will</span>
+                    <span class="word" data-delay="3900">run</span>
+                    <span class="word" data-delay="4000">faster,</span>
+                    <span class="word" data-delay="4100">stretch</span>
+                    <span class="word" data-delay="4200">out</span>
+                    <span class="word" data-delay="4300">our</span>
+                    <span class="word" data-delay="4400">arms</span>
+                    <span class="word" data-delay="4500">farther.</span>
+                    <span class="word" data-delay="4600">.</span>
+                    <span class="word" data-delay="4700">.</span>
+                    <span class="word" data-delay="4800">And</span>
+                    <span class="word" data-delay="4900">then</span>
+                    <span class="word" data-delay="5000">one</span>
+                    <span class="word" data-delay="5100">fine</span>
+                    <span class="word" data-delay="5200">morning"</span>
+                </p>
+                <p class="text-xs text-blue-300/60 mt-4 font-mono tracking-wider">
+                    <span class="word" data-delay="5400">—</span>
+                    <span class="word" data-delay="5500">F.</span>
+                    <span class="word" data-delay="5600">Scott</span>
+                    <span class="word" data-delay="5700">Fitzgerald,</span>
+                    <span class="word" data-delay="5800">The</span>
+                    <span class="word" data-delay="5900">Great</span>
+                    <span class="word" data-delay="6000">Gatsby</span>
+                </p>
+            </div>
+            
+            <div class="mt-8 flex justify-center space-x-6 opacity-0" style="animation: word-appear 1s ease-out forwards; animation-delay: 6.5s;">
+                <div class="w-2 h-2 bg-blue-400 rounded-full opacity-60 animate-pulse"></div>
+                <div class="w-2 h-2 bg-blue-300 rounded-full opacity-40 animate-pulse" style="animation-delay: 0.5s;"></div>
+                <div class="w-2 h-2 bg-blue-400 rounded-full opacity-60 animate-pulse" style="animation-delay: 1s;"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Login Page -->
+    <div id="login-page" class="content hidden">
+        <div class="relative min-h-screen overflow-hidden flex items-center justify-center">
+            <div class="relative flex flex-col overflow-hidden beautiful-shadow transition-custom max-w-md w-full text-white rounded-3xl mx-4">
+                <div class="absolute z-0 inset-0 backdrop-blur-md overflow-hidden isolate"></div>
+                <div class="z-10 absolute inset-0 bg-white bg-opacity-15"></div>
+                <div class="absolute inset-0 z-20 overflow-hidden shadow-inner rounded-3xl" style="box-shadow: inset 2px 2px 1px 0 rgba(255, 255, 255, 0.5), inset -1px -1px 1px 1px rgba(255, 255, 255, 0.5)"></div>
+                
+                <div class="z-30 relative p-8">
+                    <!-- Header -->
+                    <div class="text-center mb-8">
+                        <div class="flex justify-between items-start mb-6">
+                            <button id="back-home" class="p-2 hover:bg-white/10 rounded-lg transition-colors text-white/60 hover:text-white">
+                                <i data-lucide="arrow-left" class="h-4 w-4"></i>
+                            </button>
+                            <div class="flex-1"></div>
+                        </div>
+                        <div class="inline-flex items-center justify-center mb-4">
+                            <i data-lucide="infinity" class="text-blue-300 h-12 w-12"></i>
+                        </div>
+                        <h1 class="text-2xl font-light text-blue-300 tracking-tight mb-2">Welcome to Infinity</h1>
+                        <p class="text-sm text-white/60">Enter your credentials to access the portal</p>
+                    </div>
+
+                    <!-- Login Form -->
+                    <form id="login-form" class="space-y-6">
+                        <div>
+                            <label for="email" class="block text-sm font-medium text-white/80 mb-2">Email</label>
+                            <input
+                                type="email"
+                                id="email"
+                                name="email"
+                                required
+                                class="glass-input w-full px-4 py-3 rounded-xl text-white placeholder:text-white/40 text-sm"
+                                placeholder="you@example.com"
+                            />
+                        </div>
+
+                        <div>
+                            <label for="password" class="block text-sm font-medium text-white/80 mb-2">Password</label>
+                            <input
+                                type="password"
+                                id="password"
+                                name="password"
+                                required
+                                class="glass-input w-full px-4 py-3 rounded-xl text-white placeholder:text-white/40 text-sm"
+                                placeholder="••••••••"
+                            />
+                        </div>
+
+                        <div class="flex items-center justify-between">
+                            <label class="flex items-center">
+                                <input type="checkbox" class="w-4 h-4 rounded border-white/20 bg-white/10 text-blue-400 focus:ring-blue-400 focus:ring-offset-0">
+                                <span class="ml-2 text-sm text-white/60">Remember me</span>
+                            </label>
+                            <a href="#" class="text-sm text-blue-300 hover:text-blue-200 transition-colors">Forgot password?</a>
+                        </div>
+
+                        <button
+                            type="submit"
+                            class="login-button w-full py-3 rounded-xl text-white font-medium transition-all"
+                        >
+                            Sign In
+                        </button>
+
+                        <div id="login-error" class="error-message hidden">
+                            Invalid credentials. Please try again.
+                        </div>
+                    </form>
+
+                    <!-- Footer -->
+                    <div class="mt-8 text-center">
+                        <p class="text-sm text-white/40">
+                            Don't have an account? 
+                            <button id="show-signup" class="text-blue-300 hover:text-blue-200 transition-colors underline">Sign up</button>
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sign Up Page -->
+    <div id="signup-page" class="content hidden">
+        <div class="relative min-h-screen overflow-hidden flex items-center justify-center">
+            <div class="relative flex flex-col overflow-hidden beautiful-shadow transition-custom max-w-md w-full text-white rounded-3xl mx-4">
+                <div class="absolute z-0 inset-0 backdrop-blur-md overflow-hidden isolate"></div>
+                <div class="z-10 absolute inset-0 bg-white bg-opacity-15"></div>
+                <div class="absolute inset-0 z-20 overflow-hidden shadow-inner rounded-3xl" style="box-shadow: inset 2px 2px 1px 0 rgba(255, 255, 255, 0.5), inset -1px -1px 1px 1px rgba(255, 255, 255, 0.5)"></div>
+                
+                <div class="z-30 relative p-8">
+                    <!-- Header -->
+                    <div class="text-center mb-8">
+                        <div class="flex justify-between items-start mb-6">
+                            <button id="back-login" class="p-2 hover:bg-white/10 rounded-lg transition-colors text-white/60 hover:text-white">
+                                <i data-lucide="arrow-left" class="h-4 w-4"></i>
+                            </button>
+                            <div class="flex-1"></div>
+                        </div>
+                        <div class="inline-flex items-center justify-center mb-4">
+                            <i data-lucide="infinity" class="text-blue-300 h-12 w-12"></i>
+                        </div>
+                        <h1 class="text-2xl font-light text-blue-300 tracking-tight mb-2">Join Infinity</h1>
+                        <p class="text-sm text-white/60">Create your account to get started</p>
+                    </div>
+
+                    <!-- Sign Up Form -->
+                    <form id="signup-form" class="space-y-6">
+                        <div>
+                            <label for="signup-name" class="block text-sm font-medium text-white/80 mb-2">Full Name</label>
+                            <input
+                                type="text"
+                                id="signup-name"
+                                name="name"
+                                required
+                                class="glass-input w-full px-4 py-3 rounded-xl text-white placeholder:text-white/40 text-sm"
+                                placeholder="Your full name"
+                            />
+                        </div>
+
+                        <div>
+                            <label for="signup-email" class="block text-sm font-medium text-white/80 mb-2">Email</label>
+                            <input
+                                type="email"
+                                id="signup-email"
+                                name="email"
+                                required
+                                class="glass-input w-full px-4 py-3 rounded-xl text-white placeholder:text-white/40 text-sm"
+                                placeholder="you@example.com"
+                            />
+                        </div>
+
+                        <div>
+                            <label for="signup-password" class="block text-sm font-medium text-white/80 mb-2">Password</label>
+                            <input
+                                type="password"
+                                id="signup-password"
+                                name="password"
+                                required
+                                minlength="6"
+                                class="glass-input w-full px-4 py-3 rounded-xl text-white placeholder:text-white/40 text-sm"
+                                placeholder="••••••••"
+                            />
+                        </div>
+
+                        <div>
+                            <label for="signup-confirm-password" class="block text-sm font-medium text-white/80 mb-2">Confirm Password</label>
+                            <input
+                                type="password"
+                                id="signup-confirm-password"
+                                name="confirmPassword"
+                                required
+                                minlength="6"
+                                class="glass-input w-full px-4 py-3 rounded-xl text-white placeholder:text-white/40 text-sm"
+                                placeholder="••••••••"
+                            />
+                        </div>
+
+                        <div class="flex items-start">
+                            <input type="checkbox" id="terms" required class="w-4 h-4 mt-0.5 rounded border-white/20 bg-white/10 text-blue-400 focus:ring-blue-400 focus:ring-offset-0">
+                            <label for="terms" class="ml-2 text-sm text-white/60">
+                                I agree to the <button type="button" class="text-blue-300 hover:text-blue-200 underline">Terms of Service</button> and <button type="button" class="text-blue-300 hover:text-blue-200 underline">Privacy Policy</button>
+                            </label>
+                        </div>
+
+                        <button
+                            type="submit"
+                            class="login-button w-full py-3 rounded-xl text-white font-medium transition-all"
+                        >
+                            Create Account
+                        </button>
+
+                        <div id="signup-error" class="error-message hidden">
+                            Please check your information and try again.
+                        </div>
+                    </form>
+
+                    <!-- Footer -->
+                    <div class="mt-8 text-center">
+                        <p class="text-sm text-white/40">
+                            Already have an account? 
+                            <button id="show-login" class="text-blue-300 hover:text-blue-200 transition-colors underline">Sign in</button>
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Chat Interface -->
+    <div id="chat-interface" class="content hidden">
+        <div class="relative min-h-screen overflow-hidden flex">
+            <!-- Sidebar -->
+            <div id="sidebar" class="sidebar fixed left-0 top-0 h-full w-80 z-40">
+                <div class="relative h-full flex flex-col overflow-hidden beautiful-shadow transition-custom rounded-r-3xl">
+                    <div class="absolute z-0 inset-0 backdrop-blur-md overflow-hidden isolate rounded-r-3xl"></div>
+                    <div class="z-10 absolute inset-0 bg-white bg-opacity-15"></div>
+                    <div class="absolute inset-0 z-20 overflow-hidden shadow-inner rounded-r-3xl" style="box-shadow: inset -2px 0px 1px 0 rgba(255, 255, 255, 0.5);"></div>
+                    
+                    <div class="relative z-30 p-6">
+                        <div class="flex items-center justify-between mb-6">
+                            <h2 class="text-lg font-medium text-white">Chat History</h2>
+                            <button id="close-sidebar" class="p-2 hover:bg-white/10 rounded-lg transition-colors">
+                                <i data-lucide="x" class="h-4 w-4 text-white/60"></i>
+                            </button>
+                        </div>
+                        <div class="space-y-2">
+                            <div class="p-3 rounded-lg bg-white/5 hover:bg-white/10 cursor-pointer transition-colors">
+                                <p class="text-sm text-white/80 truncate">Previous conversation about AI ethics...</p>
+                                <p class="text-xs text-white/40 mt-1">2 hours ago</p>
+                            </div>
+                            <div class="p-3 rounded-lg hover:bg-white/10 cursor-pointer transition-colors">
+                                <p class="text-sm text-white/80 truncate">Discussion on quantum computing...</p>
+                                <p class="text-xs text-white/40 mt-1">Yesterday</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Settings Panel -->
+            <div id="settings-panel" class="settings-panel fixed right-0 top-0 h-full w-80 z-40">
+                <div class="relative h-full flex flex-col overflow-hidden beautiful-shadow transition-custom rounded-l-3xl">
+                    <div class="absolute z-0 inset-0 backdrop-blur-md overflow-hidden isolate rounded-l-3xl"></div>
+                    <div class="z-10 absolute inset-0 bg-white bg-opacity-15"></div>
+                    <div class="absolute inset-0 z-20 overflow-hidden shadow-inner rounded-l-3xl" style="box-shadow: inset 2px 0px 1px 0 rgba(255, 255, 255, 0.5);"></div>
+                    
+                    <div class="relative z-30 p-6">
+                        <div class="flex items-center justify-between mb-6">
+                            <h2 class="text-lg font-medium text-white">Settings</h2>
+                            <button id="close-settings" class="p-2 hover:bg-white/10 rounded-lg transition-colors">
+                                <i data-lucide="x" class="h-4 w-4 text-white/60"></i>
+                            </button>
+                        </div>
+                        <div class="space-y-4">
+                            <div>
+                                <h3 class="text-sm font-medium text-white/80 mb-2">Profile</h3>
+                                <div class="flex items-center gap-3">
+                                    <img id="user-avatar" src="https://i.pravatar.cc/40" alt="User Avatar" class="w-10 h-10 rounded-full">
+                                    <div>
+                                        <p id="settings-user-name" class="text-white font-medium"></p>
+                                        <p id="settings-user-email" class="text-xs text-white/60"></p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div>
+                                <label class="text-sm text-white/60">Theme</label>
+                                <select class="mt-2 w-full glass-input px-3 py-2 rounded-lg text-sm">
+                                    <option>Dark</option>
+                                    <option>Light</option>
+                                    <option>Auto</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="text-sm text-white/60">Language</label>
+                                <select class="mt-2 w-full glass-input px-3 py-2 rounded-lg text-sm">
+                                    <option>English</option>
+                                    <option>Spanish</option>
+                                    <option>French</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Main Chat Area -->
+            <div class="flex-1 flex items-center justify-center">
+                <!-- Glass Chat Container -->
+                <div class="relative flex flex-col overflow-hidden cursor-default beautiful-shadow transition-custom max-w-4xl w-full font-semibold text-white rounded-3xl mx-4 h-[90vh]">
+                    <div class="absolute z-0 inset-0 backdrop-blur-md overflow-hidden isolate"></div>
+                    <div class="z-10 absolute inset-0 bg-white bg-opacity-15"></div>
+                    <div class="absolute inset-0 z-20 overflow-hidden shadow-inner rounded-3xl" style="box-shadow: inset 2px 2px 1px 0 rgba(255, 255, 255, 0.5), inset -1px -1px 1px 1px rgba(255, 255, 255, 0.5)"></div>
+                    
+                    <!-- Header Section -->
+                    <div class="z-30 relative text-center bg-black/10 pt-6 pr-6 pb-6 pl-6 flex items-center justify-between border-b border-white/20">
+                        <div class="flex items-center gap-3">
+                            <button id="menu-btn" class="hover:bg-white/10 w-8 h-8 text-white border-0 rounded-lg flex items-center justify-center transition-all">
+                                <i data-lucide="menu" class="h-4 w-4"></i>
+                            </button>
+                            <div class="flex items-center gap-3">
+                                <div class="inline-flex items-center justify-center">
+                                    <i data-lucide="infinity" class="text-blue-300 h-8 w-8"></i>
+                                </div>
+                                <div>
+                                    <h1 class="text-xl font-normal text-blue-300 tracking-tight">Infinity</h1>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <button class="hover:bg-white/10 w-8 h-8 text-white border-0 rounded-lg flex items-center justify-center transition-all">
+                                <i data-lucide="download" class="h-4 w-4"></i>
+                            </button>
+                            <button id="settings-btn" class="hover:bg-white/10 w-8 h-8 text-white border-0 rounded-lg flex items-center justify-center transition-all">
+                                <i data-lucide="settings" class="h-4 w-4"></i>
+                            </button>
+                            <button id="logout-btn" class="hover:bg-red-500/20 w-8 h-8 text-white hover:text-red-300 border-0 rounded-lg flex items-center justify-center transition-all">
+                                <i data-lucide="log-out" class="h-4 w-4"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Messages Container -->
+                    <div id="messages-container" class="z-30 flex-1 overflow-y-auto p-6 space-y-4 scrollbar-thin">
+                        <div id="messages" class="space-y-4">
+                            <!-- Messages will be inserted here -->
+                        </div>
+                        <div id="typing-indicator" class="hidden">
+                            <div class="flex items-center space-x-2 text-blue-300">
+                                <span class="text-sm">Mira is typing</span>
+                                <div class="flex space-x-1">
+                                    <span class="typing-dot"></span>
+                                    <span class="typing-dot"></span>
+                                    <span class="typing-dot"></span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Input Area -->
+                    <div class="z-30 p-6 pt-0">
+                        <form id="chat-form" class="relative">
+                            <div class="message-bubble border border-white/20 p-4 flex items-center gap-3">
+                                <button type="button" class="h-9 w-9 hover:bg-white/10 text-white/60 hover:text-white border-0 rounded-full flex items-center justify-center transition-all">
+                                    <i data-lucide="plus" class="h-4 w-4"></i>
+                                </button>
+                                <div class="flex-1">
+                                    <input
+                                        id="chat-input"
+                                        type="text"
+                                        placeholder="Message Infinity AI..."
+                                        class="w-full border-0 bg-transparent text-white placeholder:text-white/50 focus:outline-none text-sm py-2"
+                                    />
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <button type="button" class="h-9 w-9 hover:bg-white/10 text-white/60 hover:text-white border-0 rounded-full flex items-center justify-center transition-all">
+                                        <i data-lucide="paperclip" class="h-4 w-4"></i>
+                                    </button>
+                                    <button type="button" class="h-9 w-9 hover:bg-white/10 text-white/60 hover:text-white border-0 rounded-full flex items-center justify-center transition-all">
+                                        <i data-lucide="mic" class="h-4 w-4"></i>
+                                    </button>
+                                    <button
+                                        type="submit"
+                                        id="send-btn"
+                                        class="h-9 w-9 bg-blue-500 hover:bg-blue-600 text-white border-0 rounded-full flex items-center justify-center transition-all duration-200 hover:scale-105 disabled:opacity-50"
+                                    >
+                                        <i data-lucide="send" class="h-4 w-4"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Logout Confirmation Modal -->
+    <div id="logout-modal" class="logout-modal">
+        <div class="logout-modal-content">
+            <div class="flex justify-center mb-4">
+                <i data-lucide="infinity" class="text-blue-300 h-12 w-12"></i>
+            </div>
+            <h2 class="text-xl font-light text-white mb-2">Leave Infinity?</h2>
+            <p class="text-white/60 mb-6">Are you sure you want to log out? Your session will end.</p>
+            <div class="flex gap-3 justify-center">
+                <button id="cancel-logout" class="px-6 py-2 rounded-full text-white/80 hover:text-white border border-white/20 hover:border-white/40 transition-all">
+                    Stay
+                </button>
+                <button id="confirm-logout" class="px-6 py-2 rounded-full bg-red-500 hover:bg-red-600 text-white transition-all">
+                    Log Out
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Initialize Lucide icons
+        lucide.createIcons();
+
+        // Initialize Three.js scene with shader
+        const canvas = document.getElementById('shader-canvas');
+        const renderer = new THREE.WebGLRenderer({ canvas });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+
+        const scene = new THREE.Scene();
+        const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+
+        const shaderMaterial = new THREE.ShaderMaterial({
+            uniforms: {
+                iTime: { value: 0 },
+                iResolution: { value: new THREE.Vector3(window.innerWidth, window.innerHeight, 1) },
+            },
+            vertexShader: `
+                void main() {
+                    gl_Position = vec4(position, 1.0);
+                }
+            `,
+            fragmentShader: `
+                uniform float iTime;
+                uniform vec3 iResolution;
+
+                #define TAU 6.2831853071795865
+                #define TUNNEL_LAYERS 96
+                #define RING_POINTS 128
+                #define POINT_SIZE 1.8
+                #define POINT_COLOR_A vec3(1.0)
+                #define POINT_COLOR_B vec3(0.7)
+                #define SPEED 0.7
+
+                float sq(float x) {
+                    return x*x;   
+                }
+
+                vec2 AngRep(vec2 uv, float angle) {
+                    vec2 polar = vec2(atan(uv.y, uv.x), length(uv));
+                    polar.x = mod(polar.x + angle / 2.0, angle) - angle / 2.0; 
+                    return polar.y * vec2(cos(polar.x), sin(polar.x));
+                }
+
+                float sdCircle(vec2 uv, float r) {
+                    return length(uv) - r;
+                }
+
+                vec3 MixShape(float sd, vec3 fill, vec3 target) {
+                    float blend = smoothstep(0.0, 1.0/iResolution.y, sd);
+                    return mix(fill, target, blend);
+                }
+
+                vec2 TunnelPath(float x) {
+                    vec2 offs = vec2(0, 0);
+                    offs.x = 0.2 * sin(TAU * x * 0.5) + 0.4 * sin(TAU * x * 0.2 + 0.3);
+                    offs.y = 0.3 * cos(TAU * x * 0.3) + 0.2 * cos(TAU * x * 0.1);
+                    offs *= smoothstep(1.0, 4.0, x);
+                    return offs;
+                }
+
+                void main() {
+                    vec2 res = iResolution.xy / iResolution.y;
+                    vec2 uv = gl_FragCoord.xy / iResolution.y;
+                    uv -= res/2.0;
+                    
+                    vec3 color = vec3(0);
+                    
+                    float repAngle = TAU / float(RING_POINTS);
+                    float pointSize = POINT_SIZE/2.0/iResolution.y;
+                    
+                    float camZ = iTime * SPEED;
+                    vec2 camOffs = TunnelPath(camZ);
+                    
+                    for(int i = 1; i <= TUNNEL_LAYERS; i++) {
+                        float pz = 1.0 - (float(i) / float(TUNNEL_LAYERS));
+                        pz -= mod(camZ, 4.0 / float(TUNNEL_LAYERS));
+                        
+                        vec2 offs = TunnelPath(camZ + pz) - camOffs;
+                        float ringRad = 0.15 * (1.0 / sq(pz * 0.8 + 0.4));
+                        
+                        if(abs(length(uv + offs) - ringRad) < pointSize * 1.5) {
+                            vec2 aruv = AngRep(uv + offs, repAngle);
+                            float pdist = sdCircle(aruv - vec2(ringRad, 0), pointSize);
+                            vec3 ptColor = (mod(float(i / 2), 2.0) == 0.0) ? POINT_COLOR_A : POINT_COLOR_B;
+                            float shade = (1.0-pz);
+                            color = MixShape(pdist, ptColor * shade, color);
+                        }
+                    }
+                    
+                    gl_FragColor = vec4(color, 1.0);
+                }
+            `
+        });
+
+        const geometry = new THREE.PlaneGeometry(2, 2);
+        const mesh = new THREE.Mesh(geometry, shaderMaterial);
+        scene.add(mesh);
+
+        let lastTime = 0;
+        const speedMultiplier = 0.3;
+
+        function animate(time) {
+            requestAnimationFrame(animate);
+            time *= 0.001;
+            const deltaTime = time - lastTime;
+            lastTime = time;
+            
+            shaderMaterial.uniforms.iTime.value += deltaTime * speedMultiplier;
+            renderer.render(scene, camera);
+        }
+
+        window.addEventListener('resize', () => {
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            shaderMaterial.uniforms.iResolution.value.set(window.innerWidth, window.innerHeight, 1);
+        });
+
+        // Word animation
+        function animateWords() {
+            const words = document.querySelectorAll('.word');
+            words.forEach(word => {
+                const delay = parseInt(word.getAttribute('data-delay')) || 0;
+                setTimeout(() => {
+                    word.style.animation = 'word-appear 1s ease-out forwards';
+                }, delay);
+            });
+        }
+
+        // Mouse interaction
+        document.addEventListener('mousemove', (e) => {
+            const words = document.querySelectorAll('.word');
+            words.forEach(word => {
+                const rect = word.getBoundingClientRect();
+                const distance = Math.sqrt(
+                    Math.pow(e.clientX - (rect.left + rect.width/2), 2) + 
+                    Math.pow(e.clientY - (rect.top + rect.height/2), 2)
+                );
+                
+                if (distance < 100) {
+                    word.style.transform = 'translateY(-3px) scale(1.05)';
+                    word.style.color = '#60a5fa';
+                } else {
+                    word.style.transform = 'translateY(0) scale(1)';
+                    word.style.color = '';
+                }
+            });
+        });
+
+        // Page transitions
+        const landingPage = document.getElementById('landing-page');
+        const loginPage = document.getElementById('login-page');
+        const signupPage = document.getElementById('signup-page');
+        const chatInterface = document.getElementById('chat-interface');
+        const enterPortalBtn = document.getElementById('enter-portal');
+        const loginForm = document.getElementById('login-form');
+        const signupForm = document.getElementById('signup-form');
+        const loginError = document.getElementById('login-error');
+        const signupError = document.getElementById('signup-error');
+        
+        // Navigation buttons
+        const backHomeBtn = document.getElementById('back-home');
+        const backLoginBtn = document.getElementById('back-login');
+        const showSignupBtn = document.getElementById('show-signup');
+        const showLoginBtn = document.getElementById('show-login');
+        
+        // Logout functionality
+        const logoutBtn = document.getElementById('logout-btn');
+        const logoutModal = document.getElementById('logout-modal');
+        const cancelLogoutBtn = document.getElementById('cancel-logout');
+        const confirmLogoutBtn = document.getElementById('confirm-logout');
+
+        // User session
+        let currentUser = null;
+        let currentUserName = null;
+
+        // Transition to login page
+        enterPortalBtn.addEventListener('click', () => {
+            landingPage.classList.add('fade-out');
+            setTimeout(() => {
+                landingPage.classList.add('hidden');
+                loginPage.classList.remove('hidden');
+                loginPage.classList.add('fade-in');
+                document.getElementById('email').focus();
+                // Re-initialize Lucide icons
+                lucide.createIcons();
+            }, 500);
+        });
+
+        // Back to home from login
+        backHomeBtn.addEventListener('click', () => {
+            loginPage.classList.add('fade-out');
+            setTimeout(() => {
+                loginPage.classList.add('hidden');
+                landingPage.classList.remove('hidden');
+                landingPage.classList.add('fade-in');
+                lucide.createIcons();
+            }, 500);
+        });
+
+        // Show sign up form
+        showSignupBtn.addEventListener('click', () => {
+            loginPage.classList.add('fade-out');
+            setTimeout(() => {
+                loginPage.classList.add('hidden');
+                signupPage.classList.remove('hidden');
+                signupPage.classList.add('fade-in');
+                document.getElementById('signup-name').focus();
+                lucide.createIcons();
+            }, 500);
+        });
+
+        // Back to login from signup
+        backLoginBtn.addEventListener('click', () => {
+            signupPage.classList.add('fade-out');
+            setTimeout(() => {
+                signupPage.classList.add('hidden');
+                loginPage.classList.remove('hidden');
+                loginPage.classList.add('fade-in');
+                document.getElementById('email').focus();
+                lucide.createIcons();
+            }, 500);
+        });
+
+        // Show login from signup
+        showLoginBtn.addEventListener('click', () => {
+            signupPage.classList.add('fade-out');
+            setTimeout(() => {
+                signupPage.classList.add('hidden');
+                loginPage.classList.remove('hidden');
+                loginPage.classList.add('fade-in');
+                document.getElementById('email').focus();
+                lucide.createIcons();
+            }, 500);
+        });
+
+        // Handle login
+        loginForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+
+            // Simple validation (in real app, this would be server-side)
+            if (email && password.length >= 6) {
+                currentUser = email;
+                currentUserName = email.split('@')[0]; // Use email prefix as name
+                loginError.classList.add('hidden');
+                
+                // Transition to chat
+                loginPage.classList.add('fade-out');
+                setTimeout(() => {
+                    loginPage.classList.add('hidden');
+                    chatInterface.classList.remove('hidden');
+                    chatInterface.classList.add('fade-in');
+                    document.getElementById('settings-user-name').textContent = currentUserName;
+                    document.getElementById('settings-user-email').textContent = currentUser;
+                    renderMessages();
+                    document.getElementById('chat-input').focus();
+                    // Re-initialize Lucide icons
+                    lucide.createIcons();
+                }, 500);
+            } else {
+                loginError.classList.remove('hidden');
+            }
+        });
+
+        // Handle signup
+        signupForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const name = document.getElementById('signup-name').value;
+            const email = document.getElementById('signup-email').value;
+            const password = document.getElementById('signup-password').value;
+            const confirmPassword = document.getElementById('signup-confirm-password').value;
+            const termsAccepted = document.getElementById('terms').checked;
+
+            // Validation
+            if (!name || !email || !password || !confirmPassword) {
+                signupError.textContent = 'Please fill in all fields.';
+                signupError.classList.remove('hidden');
+                return;
+            }
+
+            if (password !== confirmPassword) {
+                signupError.textContent = 'Passwords do not match.';
+                signupError.classList.remove('hidden');
+                return;
+            }
+
+            if (password.length < 6) {
+                signupError.textContent = 'Password must be at least 6 characters.';
+                signupError.classList.remove('hidden');
+                return;
+            }
+
+            if (!termsAccepted) {
+                signupError.textContent = 'Please accept the Terms of Service and Privacy Policy.';
+                signupError.classList.remove('hidden');
+                return;
+            }
+
+            // Success - redirect to chat
+            currentUser = email;
+            currentUserName = name;
+            signupError.classList.add('hidden');
+            
+            signupPage.classList.add('fade-out');
+            setTimeout(() => {
+                signupPage.classList.add('hidden');
+                chatInterface.classList.remove('hidden');
+                chatInterface.classList.add('fade-in');
+                document.getElementById('settings-user-name').textContent = currentUserName;
+                document.getElementById('settings-user-email').textContent = currentUser;
+                renderMessages();
+                document.getElementById('chat-input').focus();
+                lucide.createIcons();
+            }, 500);
+        });
+
+        // Logout functionality
+        logoutBtn.addEventListener('click', () => {
+            logoutModal.classList.add('show');
+            lucide.createIcons();
+        });
+
+        cancelLogoutBtn.addEventListener('click', () => {
+            logoutModal.classList.remove('show');
+        });
+
+        confirmLogoutBtn.addEventListener('click', () => {
+            // Clear user session
+            currentUser = null;
+            currentUserName = null;
+            
+            // Hide modal and transition to landing page
+            logoutModal.classList.remove('show');
+            chatInterface.classList.add('fade-out');
+            
+            setTimeout(() => {
+                chatInterface.classList.add('hidden');
+                landingPage.classList.remove('hidden');
+                landingPage.classList.add('fade-in');
+                
+                // Reset forms
+                document.getElementById('login-form').reset();
+                document.getElementById('signup-form').reset();
+                loginError.classList.add('hidden');
+                signupError.classList.add('hidden');
+                
+                lucide.createIcons();
+            }, 500);
+        });
+
+        // Chat functionality
+        const chatForm = document.getElementById('chat-form');
+        const chatInput = document.getElementById('chat-input');
+        const messagesContainer = document.getElementById('messages');
+        const typingIndicator = document.getElementById('typing-indicator');
+
+        let messages = [
+            {
+                id: '1',
+                content: `Welcome to Infinity! I'm here to help you organize your life towards the future. What would you like to explore today?`,
+                sender: 'ai',
+                timestamp: new Date()
+            }
+        ];
+
+        // Format time
+        function formatTime(date) {
+            return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        }
+
+        // Create message element
+        function createMessageElement(message) {
+            const isUser = message.sender === 'user';
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message-container animate-slide-up group ${isUser ? 'flex justify-end' : 'flex justify-start'} mb-4`;
+            
+            messageDiv.innerHTML = `
+                <div class="max-w-[75%] ${isUser ? 'order-2' : 'order-1'}">
+                    <div class="message-bubble ${isUser ? 'user-message' : ''} p-4">
+                        <div class="text-sm text-white leading-relaxed">
+                            ${message.content}
+                        </div>
+                        <div class="text-xs mt-3 text-white/50">
+                            ${formatTime(message.timestamp)}
+                        </div>
+                    </div>
+                    ${!isUser ? `
+                    <div class="message-actions flex gap-1 mt-2 ml-2">
+                        <button class="p-2 hover:bg-white/10 rounded-full transition-colors group">
+                            <i data-lucide="copy" class="h-3 w-3 text-white/40 group-hover:text-white/80"></i>
+                        </button>
+                        <button class="p-2 hover:bg-white/10 rounded-full transition-colors group">
+                            <i data-lucide="thumbs-up" class="h-3 w-3 text-white/40 group-hover:text-white/80"></i>
+                        </button>
+                        <button class="p-2 hover:bg-white/10 rounded-full transition-colors group">
+                            <i data-lucide="thumbs-down" class="h-3 w-3 text-white/40 group-hover:text-white/80"></i>
+                        </button>
+                        <button class="p-2 hover:bg-white/10 rounded-full transition-colors group">
+                            <i data-lucide="refresh-cw" class="h-3 w-3 text-white/40 group-hover:text-white/80"></i>
+                        </button>
+                    </div>
+                    ` : ''}
+                </div>
+            `;
+            
+            return messageDiv;
+        }
+
+        // Render messages
+        function renderMessages() {
+            messagesContainer.innerHTML = '';
+            messages.forEach(message => {
+                messagesContainer.appendChild(createMessageElement(message));
+            });
+            scrollToBottom();
+            // Re-initialize icons for new messages
+            lucide.createIcons();
+        }
+
+        // Scroll to bottom
+        function scrollToBottom() {
+            messagesContainer.parentElement.scrollTop = messagesContainer.parentElement.scrollHeight;
+        }
+
+        // Handle form submission
+        chatForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const content = chatInput.value.trim();
+            if (!content) return;
+
+            // Add user message
+            const userMessage = {
+                id: Date.now().toString(),
+                content: content,
+                sender: 'user',
+                timestamp: new Date()
+            };
+            messages.push(userMessage);
+            renderMessages();
+            chatInput.value = '';
+
+            // Show typing indicator
+            typingIndicator.classList.remove('hidden');
+            scrollToBottom();
+
+            // Simulate AI response
+            setTimeout(() => {
+                const aiMessage = {
+                    id: (Date.now() + 1).toString(),
+                    content: `I understand you're asking about "${content}". Let me help you with that. This is a simulated response, but in a real implementation, I would provide detailed assistance based on your query.`,
+                    sender: 'ai',
+                    timestamp: new Date()
+                };
+                messages.push(aiMessage);
+                typingIndicator.classList.add('hidden');
+                renderMessages();
+            }, 1500);
+        });
+
+        // Sidebar and settings panel functionality
+        const sidebar = document.getElementById('sidebar');
+        const settingsPanel = document.getElementById('settings-panel');
+        const menuBtn = document.getElementById('menu-btn');
+        const settingsBtn = document.getElementById('settings-btn');
+        const closeSidebarBtn = document.getElementById('close-sidebar');
+        const closeSettingsBtn = document.getElementById('close-settings');
+
+        menuBtn.addEventListener('click', () => {
+            sidebar.classList.add('open');
+        });
+
+        closeSidebarBtn.addEventListener('click', () => {
+            sidebar.classList.remove('open');
+        });
+
+        settingsBtn.addEventListener('click', () => {
+            settingsPanel.classList.add('open');
+        });
+
+        closeSettingsBtn.addEventListener('click', () => {
+            settingsPanel.classList.remove('open');
+        });
+
+        // Initialize
+        window.addEventListener('load', () => {
+            setTimeout(animateWords, 500);
+        });
+
+        animate(0);
+    </script>
+</body>
+</html>
